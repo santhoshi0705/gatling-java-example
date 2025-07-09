@@ -1,21 +1,26 @@
-FROM openjdk:8-jre-alpine
-MAINTAINER Jerrico Gamis <jecklgamis@gmail.com>
+# Stage 1: Build the Java project using Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 
-RUN apk update && apk add bash curl
+# Set working directory
+WORKDIR /app
 
-ENV APP_HOME /app
-RUN mkdir -m 0755 -p ${APP_HOME}/bin
+# Copy project files
+COPY . .
 
-COPY target/gatling-java-example.jar ${APP_HOME}/bin/
-COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
+# Build the project (compiles classes and downloads dependencies)
+RUN mvn clean compile
 
-RUN addgroup -S gatling && adduser -S gatling -G gatling
-RUN chown -R gatling:gatling ${APP_HOME}
-RUN chown gatling:gatling /docker-entrypoint.sh
+# Optional: run Gatling tests during build
+# RUN mvn gatling:test -Dgatling.simulationClass=com.example.YourSimulationClass
 
-USER gatling
-WORKDIR ${APP_HOME}
+# Stage 2: Runtime container using Java only (optional if you want to run later)
+FROM eclipse-temurin:17-jdk
 
-CMD ["/docker-entrypoint.sh"]
+# Set working directory
+WORKDIR /app
 
+# Copy built files from the previous stage
+COPY --from=build /app /app
+
+# Default command: Run a Gatling test (change simulation class as needed)
+CMD ["mvn", "gatling:test", "-Dgatling.simulationClass=com.jecklgamis.simulation.BasicSimulation"]
